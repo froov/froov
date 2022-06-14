@@ -1,0 +1,367 @@
+// only the organization level needs to be written as non-blob
+// froov.com/org-name/project/branch
+// we can default to eponymous org, eponymous project, main branch.
+// we can probably just rewrite this.
+// branches don't need to be different than projects? all just point at a commit?
+// we might care when we try to show them a list of all their projects.
+// /b/blob
+// when we fork we only need to copy the root - super fast.
+// tracking the updates - hard.
+
+
+
+// the very top of the build is the user's home page
+// we have to build every org they are a part of to get here, so any failure
+// fails here? as the very last step we need to consider how to give these
+// domain names that caddy can find, but maybe we can link to those?
+// hard link index.html -> blob
+// this doesn't necessarily help though, blob is namespaced?
+// everything could be in one directory, with hard links to the allocated
+// names. if we try to /part/hash them then we are back into the
+// problem of needing some kind of redirect.
+// maybe we should have a blob database that hides this kind of thing.
+// rather than fight with directories.
+// maybe we can namespace the blobs with _ and not allow any user name to begin with that.
+// another issue is deep links. if we link to schoolx/3rd grade then we still need a link that says this is schooly/3rd grade in case they want to change it and keep the links good.
+// so we need a way to map an entire file system, as a dag, to blobs :(
+// at some point these become too big and must be partitioned.
+// as an mvp we can build these paths in the actual file system
+// can we soft link them/redirect them to blobs?
+// this is problematic because we can't have the same hash at different points
+// in the tree? Maybe we can if we always use /b/xxxxx
+// for now just give up on blobs at all? or we could build the path into the
+// blob, that would at least share them among user versions.
+/*
+	b, _ := os.ReadFile(in + "/index.json")
+	var sc Folder
+	json.Unmarshal(b, &sc.FolderJson)
+
+	// root := &FolderJson{
+	// 	Title:   defaultTitle,
+	// 	Welcome: sc.Welcome,
+	// 	Pin:     []*SubjectLinkJson{},
+	// 	More:    []*SubjectLinkJson{},
+	// 	Folder:  map[string]*FolderJson{},
+	// 	Link:    &SubjectLinkJson{},
+	// }
+
+	// we can build all the subjects. Skip this step if hash=0
+	for _, o := range sc.Subject {
+		if !o.Folder {
+			s := loadTextbook(in + "/" + o.Content + ".md")
+			o.Link = s.Write(out)
+		}
+	}
+
+	// build nested folders
+	for _, o := range sc.Subject {
+		if len(o.Title) == 0 {
+			continue
+		}
+
+		ok := false
+		at := root
+		if len(o.Path) > 0 {
+			a := strings.Split(o.Path, "|")
+			for _, pc := range a {
+				at, ok = at.Folder[pc]
+				if !ok {
+					panic(o.Path)
+				}
+			}
+		}
+
+		if o.Pin {
+			at.Pin = append(at.Pin, o)
+		} else {
+			at.More = append(at.More, o)
+		}
+		// a folder will not have a hash
+		if o.Folder {
+			at.Folder[o.Title] = &FolderJson{
+				Title:   o.Title,
+				Welcome: "",
+				Pin:     []*SubjectLinkJson{},
+				More:    []*SubjectLinkJson{},
+				Folder:  map[string]*FolderJson{},
+				Link:    o,
+			}
+		}
+
+	}
+
+	walkFolders(out, root, 0)
+*/
+
+/*
+// we need to create all the pages to the root if necessary
+			at := root
+			at.More = append(at.More, o)
+			at.Folder[o.Title] = &Folder{
+				Title:   o.Title,
+				Welcome: "",
+				Pin:     []SubjectLinkJson{},
+				More:    []SubjectLinkJson{},
+				Folder:  map[string]*Folder{},
+			}
+		//
+		for _, k := range a {
+			if len(k) == 0 {
+				continue
+			}
+			find, ok := at.Folder[k]
+			if !ok {
+				find = &Folder{
+					Title:   "",
+					Welcome: "",
+					Pin:     []SubjectLinkJson{},
+					More:    []SubjectLinkJson{},
+					Folder:  map[string]*Folder{},
+				}
+				at.Folder[k] = find
+				at.More = append(at.More,
+					SubjectLinkJson{
+						Title: k,
+						Sort:  k,
+						Hash:  "",
+						Image: "",
+						Path:  "",
+						Pin:   false,
+					})
+			}
+			at = find
+		}
+
+
+	files, err := os.ReadDir(p)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, file := range files {
+		ext := path.Ext(file.Name())
+		if ext == ".md" {
+			s := loadTextbook(p + "/" + file.Name())
+			s.Write(out)
+		}
+
+	}
+}*/
+	// walk through the syllabus directory and create
+	// a parallel directory with markdown converted to html
+	// also create the index html files for linking to syllabus
+	// and sitemap.xml file.
+
+	// as we create each page of the index we need to to sort the list
+	// by pin, name.
+
+    	// project, file := path.Split(out)
+	// org, _ := path.Split(project)
+	// root, _ := path.Split(org)
+	// why force though? why not just deleting everything as a force?
+
+	// initialize the directory. should we remove all though?
+	// will that confusing anything.
+	cp.Copy(in, out)
+
+    	// we need to create an HTML blob for this folder, then return it
+	// so the parent can link to this folder. unions are a dependency graph
+	// there may be no solution for it.
+
+	// create a page from the pin and more
+	// write it to the blob store unless it is index.html.
+
+    /*
+// a folder should have pins at the top, maybe at the bottom?
+// or maybe different labels of pins?
+func (d *Builder) Folder(f *CompiledFolder, crumbs string, loader string) string {
+	var b bytes.Buffer
+
+	// this puts pins in if we have them.
+	if len(f.Pin) > 0 {
+		sort.Slice(f.Pin, func(i, j int) bool {
+			return f.Pin[i].Sort < f.Pin[j].Sort
+		})
+		d.pinList.Execute(&b, &f.Pin)
+	}
+
+	// this is the body of the page
+	sort.Slice(f.More, func(i, j int) bool {
+		return f.More[i].Sort < f.More[j].Sort
+	})
+	d.pinList.Execute(&b, &f.More)
+	return d.Page(f.Title,
+		crumbs+b.String(),
+		loader,
+	)
+}
+*/
+
+/*
+func (w *WalkState) linkFromData(data []byte, ext string) string {
+	hash := sha256.Sum256(data)
+	f := w.Out + "/b/" + hex.EncodeToString(hash[:])
+	// we don't have to write if it exists.
+	if _, err := os.Stat(f); err != nil {
+		os.WriteFile(f, data, 0666)
+		return f
+	}
+	return f
+}
+
+// store html page and return link
+func (w *WalkState) linkFromHtml(data string) string {
+	return w.linkFromData([]byte(data), ".html")
+}
+
+// to watch the current directory
+func linkFromHash(hash []byte, ext string) string {
+	return "/b/" + hex.EncodeToString(hash[:]) + ext
+}
+
+// we should store the map of titles to hash?
+
+// assets are just from titles should we assume they are always jpeg?
+// how can we do this incrementally and green field?
+// assets should be name.jpeg
+func (w *WalkState) linkFromAssetName(loadName string) (string, error) {
+	name := filepath.Base(loadName)
+	link, ok := w.Asset[name]
+	if ok {
+		return link, nil
+	}
+	// we should check the asset set and fail here if too big
+	path := w.In + "/_asset/" + loadName
+	b, e := os.ReadFile(path)
+	if e != nil {
+		return "", e
+	}
+	ext := filepath.Ext(path)
+	return w.linkFromData(b, ext), nil
+
+}
+
+// func (w *WalkState) LoadAssets(dir string, force bool) error {
+// 	o, e := os.ReadDir(dir)
+// 	if e != nil {
+// 		return e
+// 	}
+// 	for _, f := range o {
+// 		if f.IsDir() {
+// 			w.LoadAssets(dir+"/"+f.Name(), force)
+// 		} else {
+// 			w.LoadOne(f.Name(), dir+"/"+f.Name(), force)
+
+// 		}
+// 	}
+// 	return nil
+// }
+*/
+func (sb *CompiledDocument) href(lesson, page int) string {
+	if (lesson == 0 && page == 0) || page < 0 || page >= len(sb.Lesson[lesson].Slide) {
+		return sb.Hash + ".html"
+	}
+	return fmt.Sprintf("%s.%d.%d.html", sb.Hash, lesson, page)
+}
+
+
+
+
+
+
+// we build two deep /org/project/branch.html
+// we should avoid generating the service worker and manifest
+// copy the assets; we need to provide these blobs in the state
+// the output will be a flat directory that references the uuid of the folder
+// or the subject, but when we import should it be two uuid's?
+// this is chaining, like cobol, like inlining.
+// we could shorten it to a random 8 byte that would virtually never conflict.
+// is short a virtue here? In general we might want to pass down at most
+// parent and root,
+// default should be dynamic. url could be froov.com/org/project/index.html
+// project -> datum.uuid in index.json. a root datum is roughly a folder?
+
+
+
+	// we can split the rest on \n--\n to get slides.
+	// the first slide is the table of contents, there might not be more.
+	o := strings.Split(string(rest), "\n---\n")
+	beginsLesson := func(c string) bool {
+		return c[0:2] == "# "
+	}
+	for i, x := range o {
+		// to find the start of the lesson find a slide with \n#{sp}
+		if i == 0 || beginsLesson(x) {
+			r.Lesson = append(r.Lesson, Lesson{})
+		}
+		bx := &r.Lesson[len(r.Lesson)-1]
+		bx.Number = len(r.Lesson)
+		bx.Slide = append(bx.Slide, x)
+	}
+	// r.Contents = r.Lesson[0]
+	// r.Lesson = r.Lesson[1:]
+	p := w.Out + "/" + r.FrontMatter.Id
+	
+	navbar := ""
+	// this is hard to go backwards!
+	// the link is in the page.
+	// maybe we need to use one hash for the entire lesson.
+
+	for z, o := range r.Lesson {
+		for i, c := range o.Slide {
+			html := makeMd(c)
+			page := builder.Slide(navbar, html, r.href(z, i+1))
+			os.WriteFile(p+"/"+r.href(z, i), []byte(page), 0666)
+		}
+		// this should only link to the first slide.
+		r.Lesson[z].Link = r.href(z, 0)
+	}
+
+	// we need to write a lesson index and return a link
+	if false {
+		b := builder.LessonSorter(r)
+		os.WriteFile(p+"/"+r.Hash+".html", []byte(b), 0666)
+	}
+
+	// maybe here we need to add the merges?
+	// we need to compile them before we can use them
+	// to get their paths we assume the are in root?
+
+	// to create this folder we need to collect assets and children
+	// and then match them up to create the links.
+	// we will sort the pins and the rest separately
+	// we need to merge any merged folders before sorting them.
+
+	// we need to collect links from child folder
+	// also the child json if it exists
+
+	// what if I wrote this as adding paths? generally walk and add one path
+// that's either a directory or path? topsort is faster than this.
+
+// we are returning the IndexJson from this folder, that's enough to
+// generate a link anyway? why not read the IndexJson here though
+// and then pass down as necessary. return error?
+
+func (w *WalkState) shared(name string, depth int) (*CompiledFolder, error) {
+	func (w *WalkState) frontMatterFromSubject(path string) *FrontMatter {
+		f := &FrontMatter{}
+		// we might have already compiled this path, if so we can reuse it.
+	
+		return f
+	}
+	in, e := os.ReadDir(w.In + "/" + name)
+	if e != nil {
+		return nil, e
+	}
+	r := []*FrontMatter{}
+	for _, o := range in {
+		if !o.IsDir() && path.Ext(o.Name()) == ".md" {
+			f := w.frontMatterFromSubject(w.In + "/" + name + "/" + o.Name())
+			r = append(r, f)
+		}
+	}
+	return &CompiledFolder{
+		Document: r,
+	}, nil
+
+}
