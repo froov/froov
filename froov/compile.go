@@ -264,7 +264,7 @@ func (w *WalkState) compileFolder(in string, depth int) (*CompiledFolder, error)
 	return f, nil
 }
 
-func compile(in string, serviceWorker bool) {
+func Compile(in string, serviceWorker bool) {
 	z, e := os.ReadFile(in + "/css.yaml")
 	if e != nil {
 		log.Fatalf("no css.yaml")
