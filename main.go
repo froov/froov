@@ -11,6 +11,6 @@ func main() {
 	if len(os.Args) > 1 {
 		argv = os.Args[1]
 	}
-	compile(argv, false)
-	serve(argv + "/froov")
+	froov.compile(argv, false)
+	//serve(argv + "/froov")
 }

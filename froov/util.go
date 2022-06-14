@@ -1,4 +1,4 @@
-package main
+package froov
 
 import (
 	"crypto/sha256"

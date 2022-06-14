@@ -1,4 +1,4 @@
-package main
+package froov
 
 // not clear we need a sitemap
 const (

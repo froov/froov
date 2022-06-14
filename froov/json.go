@@ -1,4 +1,4 @@
-package main
+package froov
 
 type CompiledFolder struct {
 	Name string
