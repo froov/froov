@@ -1,4 +1,4 @@
-module github.com/froov/froov
+module github.com/froov/froov.git
 
 go 1.18
 
