@@ -221,7 +221,7 @@ func (w *WalkState) compileFolder(in string, depth int) (*CompiledFolder, error)
 
 		} else {
 			ext := path.Ext(o.Name())
-			if ext == ".md" {
+			if ext == ".md" && o.Name()[0] != '_' {
 				// we need to convert this to a blob
 				doc := w.compileDocument(in + "/" + o.Name())
 				if doc == nil {
@@ -238,7 +238,11 @@ func (w *WalkState) compileFolder(in string, depth int) (*CompiledFolder, error)
 	}
 
 	welcome := []byte{}
-	welcome, _ = os.ReadFile(in + "/index.md")
+	welcome, _ = os.ReadFile(in + "/_index.md")
+	ws := ""
+	if len(welcome) > 0 {
+		ws = makeMd(string(welcome))
+	}
 
 	if depth == 0 {
 		loader := `<script>
@@ -248,15 +252,12 @@ func (w *WalkState) compileFolder(in string, depth int) (*CompiledFolder, error)
 			});
 			}
 			</script>`
-		ws := ""
-		if len(welcome) > 0 {
-			ws = makeMd(string(welcome))
-		}
+
 		content := w.buildFolder(f, ws, loader, false)
 		os.WriteFile(fmt.Sprintf("%s/index.html", w.Out), []byte(content), 0666)
 	} else {
 		//crumbs := "<div class='crumb'>" + f.Title + "</div>"
-		content := w.buildFolder(f, "", "", true)
+		content := w.buildFolder(f, ws, "", true)
 		os.WriteFile(fmt.Sprintf("%s/%s.html", w.Out, f.IndexJson.Id), []byte(content), 0666)
 		//w.linkFromHtml(content)
 	}
