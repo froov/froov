@@ -225,7 +225,7 @@ func (w *WalkState) compileFolder(in string, depth int) (*CompiledFolder, error)
 				// we need to convert this to a blob
 				doc := w.compileDocument(in + "/" + o.Name())
 				if doc == nil {
-					log.Printf("error %s", in+"/"+o.Name())
+					//log.Printf("error %s", in+"/"+o.Name())
 				} else {
 					f.Document = append(f.Document, doc)
 				}
