@@ -248,7 +248,7 @@ func (w *WalkState) compileFolder(in string, depth int) (*CompiledFolder, error)
 		loader := `<script>
 			if ('serviceWorker' in navigator) {
 			window.addEventListener('load', () => {
-				navigator.serviceWorker.register('/sw.js');
+				navigator.serviceWorker.register('./sw.js');
 			});
 			}
 			</script>`
