@@ -13,13 +13,21 @@ import (
 	"github.com/gomarkdown/markdown"
 	"github.com/gomarkdown/markdown/parser"
 	"gopkg.in/yaml.v2"
+	sy "sigs.k8s.io/yaml"
 
 	cp "github.com/otiai10/copy"
 )
 
+// two tasks:
+// 1. Loop (or better yet, incremental) over pricing sets to create multiple
+// sites. temp
+
 // for scoped assets, maybe we should create an asset folder
 // for each folder and link it there? having it in one at least
 // allows us to dedupe though without hard links.
+// should this be one site under temp?
+
+// Can we drive this from sqlite? or would a csv be more appropriate?
 
 type WalkState struct {
 	Out string
@@ -33,10 +41,10 @@ type WalkState struct {
 	Folder map[string]*CompiledFolder
 }
 
+// link from asset is just taking a path and returning the next integer
+// we might need two paths, its source and its destination.
 func (w *WalkState) linkFromAsset(p string) string {
-	base := path.Base(p)
-	ext := path.Ext(p)
-	base = base[:len(base)-len(ext)]
+	base, ext := baseExt(p)
 
 	if a, ok := w.Asset[base]; ok {
 		return a
@@ -44,8 +52,15 @@ func (w *WalkState) linkFromAsset(p string) string {
 	w.NextAsset++
 	path2 := fmt.Sprintf("%s/_%d%s", w.Out, w.NextAsset, ext)
 	copyFile(p, path2)
-	w.Asset[base] = path.Base(path2)
+	w.Asset[base] = "/" + path.Base(path2)
 	return path2
+}
+
+func baseExt(p string) (string, string) {
+	ext := path.Ext(p)
+	base := path.Base(p)             // this is plus extension
+	base = base[:len(base)-len(ext)] // take off extension
+	return base, ext
 }
 
 var builder *Builder
@@ -63,7 +78,13 @@ func makeMd(mdx string) string {
 	//return string(bluemonday.UGCPolicy().SanitizeBytes(unsafe))
 }
 
-func (w *WalkState) compileDocument(path string) *FrontMatter {
+func replaceExt(p string, newExt string) string {
+	ext := path.Ext(p)
+	return p[0:len(p)-len(ext)] + newExt
+}
+
+// path is the the source, but
+func (w *WalkState) compileDocument(path string, out string) *FrontMatter {
 	input, _ := os.ReadFile(path)
 	inputs := string(input)
 	r := &CompiledDocument{
@@ -82,18 +103,53 @@ func (w *WalkState) compileDocument(path string) *FrontMatter {
 
 	err := yaml.Unmarshal([]byte(s), r.FrontMatter)
 	if err != nil {
-		log.Print("bad frontmatter")
+		log.Printf("bad frontmatter %s", path)
 		return nil
 	}
-	r.Link = r.Id + ".html"
+	bw, _ := baseExt(path)
+	r.FrontMatter.name = bw
+
+	//r.Link = r.Id + ".html"
+	// to create a link we need the path start at /temp,
+	// we would have to escape each component of the path
+	// but here we just assume they are ok.
+
+	r.Link = out[len(w.Out):]
 
 	html := string(makeMd(string(rest)))
+	if r.FrontMatter.Cart > 0 {
+		button := builder.AddCart(r.FrontMatter)
+		html = html + button
+	}
+
 	pg := builder.Page(r.Title,
 		html,
 		"",
 		true,
 	)
-	os.WriteFile(w.Out+"/"+r.Id+".html", []byte(pg), 0666)
+
+	// +r.Id+
+	os.WriteFile(out, []byte(pg), 0666)
+
+	// var dfm = map[string]any{}
+	// e := yaml.Unmarshal([]byte(s), &dfm)
+	// if e != nil {
+	// 	panic(e)
+	// }
+	// b, e := json.Marshal(&dfm)
+	// if e != nil {
+	// 	panic(e)
+	// }
+	// if e != nil || len(b) == 0 {
+	// 	log.Printf("\nbad json %e, %s\n%v", e, s, b)
+	// }
+	b, e := sy.YAMLToJSON([]byte(s))
+	if e != nil {
+		panic(e)
+	}
+	// this should maybe be at the root still?
+	os.WriteFile(w.Out+"/"+r.Id+".json", b, 0666)
+
 	return r.FrontMatter
 }
 
@@ -102,10 +158,16 @@ func (w *WalkState) compileDocument(path string) *FrontMatter {
 // how do _assets work? maybe we should not have an _asset directory, but merge them?
 // still need assets
 
-func (w *WalkState) buildFolder(f *CompiledFolder, header string, loader string, back bool) string {
+// build folder needs to allow more than one format, a list as well
+// as a grid. Or maybe the grid is just styled differently?
+
+func (w *WalkState) buildFolder(f *CompiledFolder, header string, loader string, back bool, out string) string {
 	for _, o := range f.Union {
 		mergePath := w.In + "/docs/" + o
-		mergeFolder, e := w.compileFolder(mergePath, 1)
+		// when we compile a folder union we have a source path
+		// different from the dest path. we also have to deal with naming conflicts
+
+		mergeFolder, e := w.compileFolder(mergePath, out, 1)
 		if e != nil {
 			log.Printf("error merging %s", mergePath)
 		}
@@ -122,11 +184,11 @@ func (w *WalkState) buildFolder(f *CompiledFolder, header string, loader string,
 		}
 	}
 	for _, d := range f.Document {
-		a, ok := w.Asset[d.Title]
+		a, ok := w.Asset[d.name]
 		if ok {
 			d.Image = a
 		} else {
-			log.Printf("No asset for " + d.Title)
+			log.Printf("No asset for " + d.name)
 		}
 	}
 	for _, d := range f.Folder {
@@ -162,8 +224,16 @@ func (w *WalkState) buildFolder(f *CompiledFolder, header string, loader string,
 	if len(f.Folder) > 0 {
 		builder.iconList.Execute(&b, &f.Folder)
 	}
+	// we might need fileList here instead
+	// depending on Template
+
 	if len(f.Document) > 0 {
-		builder.iconList.Execute(&b, &f.Document)
+		if f.IndexJson.Template == "list" {
+			log.Printf("list %d\n", len(f.Document))
+			builder.fileList.Execute(&b, &f.Document)
+		} else {
+			builder.iconList.Execute(&b, &f.Document)
+		}
 	}
 	return builder.Page(f.Title,
 		"<div class='header'>"+header+"</div>"+b.String(),
@@ -171,6 +241,7 @@ func (w *WalkState) buildFolder(f *CompiledFolder, header string, loader string,
 	)
 }
 
+// with an asset we only care about's source; the dest will be generated.
 func (w *WalkState) compileAssets(path string) {
 	o, e := os.ReadDir(path)
 	if e != nil {
@@ -184,12 +255,14 @@ func (w *WalkState) compileAssets(path string) {
 	}
 }
 
-func (w *WalkState) compileFolder(in string, depth int) (*CompiledFolder, error) {
+func (w *WalkState) compileFolder(in, out string, depth int) (*CompiledFolder, error) {
+	os.Mkdir(out, os.ModePerm)
 	f := &CompiledFolder{}
 	f.Name = stem(in)
 	b, e := os.ReadFile(in + "/index.json")
 	json.Unmarshal(b, &f.IndexJson)
-	f.Link = f.Id + ".html"
+	baseOut := out[len(w.Out):]
+	f.Link = baseOut + "/index.html"
 
 	if f, ok := w.Folder[in]; ok {
 		return f, nil
@@ -208,7 +281,7 @@ func (w *WalkState) compileFolder(in string, depth int) (*CompiledFolder, error)
 			if exists(in + "/" + o.Name() + "/index.json") {
 				// this is a datum, we need to compile it.
 				// we need to use its name to attach an asset it to it.
-				fc, e := w.compileFolder(in+"/"+o.Name(), depth+1)
+				fc, e := w.compileFolder(in+"/"+o.Name(), out+"/"+o.Name(), depth+1)
 				if e != nil {
 					return nil, e
 				}
@@ -223,7 +296,7 @@ func (w *WalkState) compileFolder(in string, depth int) (*CompiledFolder, error)
 			ext := path.Ext(o.Name())
 			if ext == ".md" && o.Name()[0] != '_' {
 				// we need to convert this to a blob
-				doc := w.compileDocument(in + "/" + o.Name())
+				doc := w.compileDocument(in+"/"+o.Name(), out+"/"+replaceExt(o.Name(), ".html"))
 				if doc == nil {
 					//log.Printf("error %s", in+"/"+o.Name())
 				} else {
@@ -242,6 +315,7 @@ func (w *WalkState) compileFolder(in string, depth int) (*CompiledFolder, error)
 	ws := ""
 	if len(welcome) > 0 {
 		ws = makeMd(string(welcome))
+		log.Printf("converted\n%s", string(ws))
 	}
 
 	if depth == 0 {
@@ -253,18 +327,99 @@ func (w *WalkState) compileFolder(in string, depth int) (*CompiledFolder, error)
 			}
 			</script>`
 
-		content := w.buildFolder(f, ws, loader, false)
-		os.WriteFile(fmt.Sprintf("%s/index.html", w.Out), []byte(content), 0666)
+		content := w.buildFolder(f, ws, loader, false, out)
+		os.WriteFile(fmt.Sprintf("%s/index.html", out), []byte(content), 0666)
 	} else {
 		//crumbs := "<div class='crumb'>" + f.Title + "</div>"
-		content := w.buildFolder(f, ws, "", true)
-		os.WriteFile(fmt.Sprintf("%s/%s.html", w.Out, f.IndexJson.Id), []byte(content), 0666)
+		content := w.buildFolder(f, ws, "", true, out)
+		//  f.IndexJson.Id
+		os.WriteFile(fmt.Sprintf("%s/index.html", out), []byte(content), 0666)
 		//w.linkFromHtml(content)
 	}
 
 	return f, nil
 }
 
+func frontMatter(p string) *FrontMatter {
+	input, e := os.ReadFile(p)
+	if e != nil {
+		panic(e)
+	}
+	inputs := string(input)
+	//inputs, e : = os.ReadFile(p)
+	//rest, err := frontmatter.Parse(strings.NewReader(inputs), &r.FrontMatter)
+	o1 := strings.Index(inputs, "---")
+	o2 := o1 + 4 + strings.Index(inputs[o1+4:], "---")
+	if o1 == -1 {
+		return nil
+	}
+	s := inputs[o1+4 : o2]
+
+	var r FrontMatter
+
+	err := yaml.Unmarshal([]byte(s), &r)
+	if err != nil {
+		log.Printf("bad frontmatter %s", p)
+		panic(err)
+	}
+	return &r
+}
+
+func FriendlyName(p string) string {
+	dir := path.Dir(p)
+	base, ext := baseExt(p)
+	if ext == ".md" {
+		fm := frontMatter(p)
+		if fm != nil && len(fm.Subtitle) > 0 {
+			base = strings.TrimSpace(fm.Subtitle)
+		}
+	} else if ext == ".jpeg" {
+		fm := frontMatter(dir + "/../" + base + ".md")
+		if fm != nil && len(fm.Subtitle) > 0 {
+			base = fm.Subtitle
+		}
+	}
+
+	// we want pull out only the words, putting in a hyphen in place of anything
+	// not a letter
+	var b bytes.Buffer
+	skip := false
+	for _, c := range strings.TrimSpace(strings.ToLower(base)) {
+		if c == '_' || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') {
+			if skip {
+				b.WriteRune('-')
+			}
+			skip = false
+			b.WriteRune(c)
+		} else if !skip {
+			skip = true
+		}
+	}
+	return dir + "/" + b.String() + ext
+}
+
+func RenameFolder(in string, out string) {
+	r, e := os.ReadDir(in)
+	if e != nil {
+		log.Printf("error %s", in)
+		return
+	}
+	for _, o := range r {
+		inf := in + "/" + o.Name()
+		outf := out + "/" + o.Name()
+		f := FriendlyName(inf)
+		if !o.IsDir() && inf != f {
+			f2 := out + "/" + path.Base(f)
+			fmt.Printf("mv %s %s\n", outf, f2)
+			// only rename the out copy
+
+			os.Rename(outf, f2)
+		}
+		if o.IsDir() {
+			RenameFolder(in+"/"+o.Name(), out+"/"+o.Name())
+		}
+	}
+}
 func Compile(in string, serviceWorker bool) {
 	z, e := os.ReadFile(in + "/css.yaml")
 	if e != nil {
@@ -272,7 +427,7 @@ func Compile(in string, serviceWorker bool) {
 	}
 	builder = NewBuilder(z)
 
-	out := in + "/froov"
+	out := in + "/temp"
 	os.RemoveAll(out)
 	os.Mkdir(out, os.ModePerm)
 	cp.Copy(in+"/public", out)
@@ -286,7 +441,7 @@ func Compile(in string, serviceWorker bool) {
 		Folder:        map[string]*CompiledFolder{},
 	}
 
-	_, e = o.compileFolder(in+"/docs", 0)
+	_, e = o.compileFolder(in+"/docs", out, 0)
 	if e != nil {
 		panic(e)
 	}

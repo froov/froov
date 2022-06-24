@@ -16,25 +16,30 @@ type CompiledDocument struct {
 
 // the front matter from a folder comes from index.json
 type IndexJson struct {
-	Id      string      `json:"id,omitempty" yaml:"id"`
-	Version int         `json:"version,omitempty" yaml:"version"`
-	Title   string      `json:"title,omitempty" yaml:"title"` // this is the name of the folder and its sort key
-	Sort    string      `json:"sort,omitempty"`
-	Image   string      `json:"image,omitempty" yaml:"sort"`
-	Link    string      // not loaded, computed after a load
-	Union   []string    `json:"union,omitempty"` // union all these (probably hidden) folders
-	Hidden  bool        `json:"hidden,omitempty"`
-	Pin     []*LinkInfo `json:"pin,omitempty"`
+	Id       string      `json:"id,omitempty" yaml:"id"`
+	Version  int         `json:"version,omitempty" yaml:"version"`
+	Title    string      `json:"title,omitempty" yaml:"title"` // this is the name of the folder and its sort key
+	Sort     string      `json:"sort,omitempty"`
+	Image    string      `json:"image,omitempty" yaml:"sort"`
+	Link     string      `json:"link,omitempty"`  // not loaded, computed after a load
+	Union    []string    `json:"union,omitempty"` // union all these (probably hidden) folders
+	Hidden   bool        `json:"hidden,omitempty"`
+	Pin      []*LinkInfo `json:"pin,omitempty"`
+	Template string      `json:"template,omitempty"`
 }
 type FrontMatter struct {
-	Id       string `yaml:"id"`
-	Version  int    `yaml:"version"`
-	Title    string `yaml:"title"` // this is the name of the folder and its sort key
-	Sort     string `yaml:"sort"`
-	Image    string `yaml:"image"`
-	Link     string `yaml:"link"` // not loaded, computed after a load
-	MinGrade int    `yaml:"minGrade"`
-	MaxGrade int    `yaml:"maxGrade"`
+	Id       string   `yaml:"id"`
+	Version  int      `yaml:"version"`
+	Title    string   `yaml:"title"` // this is the name of the folder and its sort key
+	Subtitle string   `yaml:"subtitle"`
+	Sort     string   `yaml:"sort"`
+	Image    string   `yaml:"image"`
+	Link     string   `yaml:"link"` // not loaded, computed after a load
+	MinGrade int      `yaml:"minGrade"`
+	MaxGrade int      `yaml:"maxGrade"`
+	IronShop []string `yaml:"ironShop"`
+	Cart     int      `yaml:"cart"`
+	name     string
 }
 
 type LinkInfo struct {
