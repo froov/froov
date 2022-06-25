@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/froov/froov/froov"
+	"github.com/froov/froov/compile"
 )
 
 // this will build a directory .froov inside the source directory (add to .gitignore)
@@ -18,6 +18,6 @@ func main() {
 		argv = os.Args[1]
 	}
 	fmt.Printf("Compiling %s", argv)
-	froov.Compile(argv, false)
+	compile.Compile(argv, false)
 	//serve(argv + "/froov")
 }

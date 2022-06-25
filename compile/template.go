@@ -1,4 +1,4 @@
-package froov
+package compile
 
 import (
 	"bytes"
